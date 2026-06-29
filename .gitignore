@@ -1,0 +1,36 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ===== 虚拟环境 =====
+venv/
+.venv/
+env/
+
+# ===== IDE / AI 助手 =====
+.idea/
+.claude/
+.vscode/
+*.swp
+*.swo
+
+# ===== 用户数据 / 构建产物 =====
+sessions/
+chroma_db/
+.streamlit/
+
+# ===== 密钥文件 =====
+.env
+.env.local
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
