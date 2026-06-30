@@ -14,12 +14,11 @@
 
 import os
 import sys
-import warnings
 import pandas as pd
 from pathlib import Path
-
-warnings.filterwarnings("ignore")
-
+import warnings
+warnings.filterwarnings("ignore", message=".*langchain-community.*is being sunset.*")
+# 屏蔽 langchain-community 弃用警告（因 langchain-dashscope 尚未适配 langchain-core 1.x）
 # LangChain 组件
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -140,15 +139,64 @@ def split_documents(documents: list[Document]) -> list[Document]:
     return split_docs
 
 
+# Windows 文件删除重试参数
+_MAX_RMDIR_RETRIES = 3
+_RMDIR_RETRY_DELAY = 1.0
+
+
+def _rmtree_onerror(func, path, exc_info) -> None:
+    """shutil.rmtree 错误回调：处理 Windows 文件锁定，重试后仍失败则抛出。"""
+    import time
+
+    for attempt in range(_MAX_RMDIR_RETRIES):
+        time.sleep(_RMDIR_RETRY_DELAY)
+        try:
+            func(path)
+            return
+        except OSError:
+            if attempt == _MAX_RMDIR_RETRIES - 1:
+                raise
+
+
+def _cleanup_old_collection() -> None:
+    """清理旧的 ChromaDB collection。
+
+    优先使用 chromadb API（正确关闭 SQLite 句柄），
+    失败时回退到文件系统删除并带重试（处理 Windows 文件锁定）。
+    """
+    if not os.path.exists(CHROMA_DIR) or not os.listdir(CHROMA_DIR):
+        return
+
+    # 方式一：通过 chromadb API 删除 collection
+    try:
+        import chromadb
+
+        client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+        try:
+            client.delete_collection(COLLECTION_NAME)
+            print("   已通过 ChromaDB API 清空旧向量库")
+            return
+        except ValueError:
+            # Collection 不存在，回退到文件系统删除
+            pass
+        finally:
+            del client
+    except ImportError:
+        pass
+
+    # 方式二：文件系统删除（Windows 文件锁定重试）
+    import shutil
+
+    shutil.rmtree(CHROMA_DIR, onerror=_rmtree_onerror)
+    print("   已清空旧向量库")
+
+
 def build_vector_store(documents: list[Document]):
     """构建 Chroma 向量数据库并持久化"""
     print(f"\n生成向量嵌入...")
     print(f"   模型: {EMBEDDING_MODEL}, Collection: {COLLECTION_NAME}")
 
-    if os.path.exists(CHROMA_DIR) and os.listdir(CHROMA_DIR):
-        import shutil
-        shutil.rmtree(CHROMA_DIR)
-        print("   已清空旧向量库")
+    _cleanup_old_collection()
 
     embeddings = DashScopeEmbeddings(model=EMBEDDING_MODEL)
     ids = [f"movie_chunk_{i:04d}" for i in range(len(documents))]

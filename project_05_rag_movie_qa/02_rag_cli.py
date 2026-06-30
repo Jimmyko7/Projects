@@ -23,10 +23,10 @@ RAG-Agent 对照：
 import os
 import sys
 import warnings
-
+warnings.filterwarnings("ignore", message=".*langchain-community.*is being sunset.*")
+# 屏蔽 langchain-community 弃用警告（因 langchain-dashscope 尚未适配 langchain-core 1.x）
 from langchain_community.vectorstores import Chroma
 
-warnings.filterwarnings("ignore")
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
