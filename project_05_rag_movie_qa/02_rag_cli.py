@@ -82,7 +82,10 @@ def format_docs(docs: list[Document]) -> str:
         name = doc.metadata.get("movie_name", "未知")
         year = doc.metadata.get("year", "未知")
         rating = doc.metadata.get("rating", "未知")
-        parts.append(f"[参考{i}] {name} ({year}) 评分:{rating}")
+        duration = doc.metadata.get("duration", "未知")
+        parts.append(
+            f"[参考{i}] {name} ({year}) 时长:{duration} 评分:{rating}"
+        )
         parts.append(doc.page_content)
         parts.append("")
     return "\n".join(parts)

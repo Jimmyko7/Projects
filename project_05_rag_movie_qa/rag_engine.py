@@ -50,8 +50,13 @@ def search_movies(query: str, vector_store, k: int = RETRIEVAL_K) -> tuple[str, 
         year = doc.metadata.get("year", "未知")
         rating = doc.metadata.get("rating", "未知")
         genre = doc.metadata.get("genre", "未知")
-        refs.append((name, year, rating, genre))
-        parts.append(f"\n[参考{i}] {name} ({year}) 类型:{genre} 评分:{rating}")
+        duration = doc.metadata.get("duration", "未知")
+        cast = doc.metadata.get("cast", "未知")
+        refs.append((name, year, rating, genre, duration, cast))
+        parts.append(
+            f"\n[参考{i}] {name} ({year}) 类型:{genre} "
+            f"时长:{duration} 评分:{rating}"
+        )
         parts.append(doc.page_content[:300])
 
     parts.append("\n【请根据以上参考资料回答用户问题】")

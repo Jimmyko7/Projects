@@ -88,12 +88,18 @@ def build_documents(df: pd.DataFrame) -> list[Document]:
             parts.append(f"【年份】{row['年份']}")
         if row.get("类型") and row["类型"] != "未知":
             parts.append(f"【类型】{row['类型']}")
-        if row.get("导演") and row["导演"] != "未知":
-            parts.append(f"【导演】{row['导演']}")
-        if row.get("语言") and row["语言"] != "未知":
-            parts.append(f"【语言】{row['语言']}")
+        if row.get("时长") and row["时长"] != "未知":
+            parts.append(f"【时长】{row['时长']}")
         if row.get("评分") and row["评分"] != "未知":
             parts.append(f"【评分】{row['评分']}/100")
+        if row.get("语言") and row["语言"] != "未知":
+            parts.append(f"【语言】{row['语言']}")
+        if row.get("导演") and row["导演"] != "未知":
+            parts.append(f"【导演】{row['导演']}")
+        if row.get("主演") and row["主演"] != "未知":
+            parts.append(f"【主演】{row['主演']}")
+        if row.get("上映时间") and row["上映时间"] != "未知":
+            parts.append(f"【上映时间】{row['上映时间']}")
         if row.get("宣传语") and row["宣传语"] != "未知":
             parts.append(f"【宣传语】{row['宣传语']}")
         if row.get("简介") and row["简介"] not in ("未知", "简介"):
@@ -106,9 +112,12 @@ def build_documents(df: pd.DataFrame) -> list[Document]:
             "movie_name": str(row.get("电影名", "未知")),
             "year": str(row.get("年份", "未知")),
             "genre": str(row.get("类型", "未知")),
-            "director": str(row.get("导演", "未知")),
-            "language": str(row.get("语言", "未知")),
+            "duration": str(row.get("时长", "未知")),
             "rating": str(row.get("评分", "未知")),
+            "language": str(row.get("语言", "未知")),
+            "director": str(row.get("导演", "未知")),
+            "cast": str(row.get("主演", "未知")),
+            "release_date": str(row.get("上映时间", "未知")),
         }
 
         documents.append(Document(page_content=page_content, metadata=metadata))
@@ -242,7 +251,7 @@ def main():
     run_quick_test(vector_store)
 
     print("\n" + "=" * 60)
-    print("完成！可运行 02/03/04 进行检索和问答")
+    print("完成！可运行 02/app 进行检索和问答")
     print("=" * 60)
 
 
