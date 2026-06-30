@@ -144,7 +144,7 @@ if prompt := st.chat_input("试试问电影相关的问题！"):
     rag_context, movie_refs = "", []
     if st.session_state.rag_enabled and rag_available:
         with st.spinner("🔍 检索中..."):
-            rag_context, movie_refs = search_movies(prompt, vector_store, RETRIEVAL_K)
+            rag_context, movie_refs = search_movies(prompt, vector_store)  # k 自动选择
         if movie_refs:
             st.caption(f"📚 检索到 {len(movie_refs)} 部相关电影")
 

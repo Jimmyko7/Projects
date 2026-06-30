@@ -107,13 +107,20 @@ def build_documents(df: pd.DataFrame) -> list[Document]:
 
         page_content = "\n".join(parts)
 
+        def _safe_int(value, default=0):
+            """清洗并转换为整数，处理 '(2026)' 等格式。"""
+            try:
+                return int(str(value).strip("()（） "))
+            except (ValueError, TypeError):
+                return default
+
         metadata = {
             "source": "tmdb_top300",
             "movie_name": str(row.get("电影名", "未知")),
-            "year": str(row.get("年份", "未知")),
+            "year": _safe_int(row.get("年份"), 0),
             "genre": str(row.get("类型", "未知")),
             "duration": str(row.get("时长", "未知")),
-            "rating": str(row.get("评分", "未知")),
+            "rating": _safe_int(row.get("评分"), 0),
             "language": str(row.get("语言", "未知")),
             "director": str(row.get("导演", "未知")),
             "cast": str(row.get("主演", "未知")),

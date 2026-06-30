@@ -35,7 +35,7 @@ from langchain_core.documents import Document
 from openai import OpenAI
 
 from config import CHROMA_DIR, RETRIEVAL_K, LLM_MODEL, LLM_BASE_URL
-from rag_engine import load_vector_store
+from rag_engine import load_vector_store, get_retrieval_k
 
 RAG_SYSTEM_PROMPT = """你是一个专业的电影顾问。请严格依据以下参考资料回答用户问题。
 
@@ -97,7 +97,7 @@ def rag_query_manual(query: str, vector_store: Chroma, client: OpenAI) -> tuple[
 
     步骤: 检索 → 格式化 → 构建提示词 → LLM生成
     """
-    docs = vector_store.similarity_search(query, k=RETRIEVAL_K)
+    docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
     context = format_docs(docs)
 
     movie_refs = [
@@ -172,7 +172,7 @@ def show_demo(vector_store: Chroma, client: OpenAI):
         print(f"提问: {query}")
         print(f"{'='*60}")
 
-        docs = vector_store.similarity_search(query, k=RETRIEVAL_K)
+        docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
         print("\n[检索结果]")
         for i, doc in enumerate(docs):
             print(f"  {i+1}. {doc.metadata.get('movie_name','?')} "
@@ -224,7 +224,7 @@ def interactive_loop(vector_store: Chroma, client: OpenAI):
                 show_demo(vector_store, client)
             else:
                 print("检索中...")
-                docs = vector_store.similarity_search(query, k=RETRIEVAL_K)
+                docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
                 print(f"找到 {len(docs)} 条参考资料:")
                 for i, doc in enumerate(docs):
                     print(f"  {i+1}. {doc.metadata.get('movie_name','?')} "
