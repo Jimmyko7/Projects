@@ -35,12 +35,12 @@ from langchain_core.documents import Document
 from openai import OpenAI
 
 from config import CHROMA_DIR, RETRIEVAL_K, LLM_MODEL, LLM_BASE_URL
-from rag_engine import load_vector_store, get_retrieval_k
+from rag_engine import load_vector_store, retrieve_docs
 
 RAG_SYSTEM_PROMPT = """你是一个专业的电影顾问。请严格依据以下参考资料回答用户问题。
 
 【参考资料】
-{context}
+{context} 
 
 【回答规则】
 1. 优先使用参考资料中的信息
@@ -91,13 +91,17 @@ def format_docs(docs: list[Document]) -> str:
     return "\n".join(parts)
 
 
-def rag_query_manual(query: str, vector_store: Chroma, client: OpenAI) -> tuple[str, list]:
+def rag_query_manual(
+    query: str, vector_store: Chroma, client: OpenAI, docs: list | None = None
+) -> tuple[str, list]:
     """
     手动组装 RAG 流水线
 
     步骤: 检索 → 格式化 → 构建提示词 → LLM生成
+    docs 由外部传入（已通过 retrieve_docs 排序），避免重复检索。
     """
-    docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
+    if docs is None:
+        docs = retrieve_docs(query, vector_store)
     context = format_docs(docs)
 
     movie_refs = [
@@ -172,14 +176,14 @@ def show_demo(vector_store: Chroma, client: OpenAI):
         print(f"提问: {query}")
         print(f"{'='*60}")
 
-        docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
+        docs = retrieve_docs(query, vector_store)
         print("\n[检索结果]")
         for i, doc in enumerate(docs):
             print(f"  {i+1}. {doc.metadata.get('movie_name','?')} "
                   f"({doc.metadata.get('year','?')})")
 
         print("\n[方式一：手动组装]")
-        answer, refs = rag_query_manual(query, vector_store, client)
+        answer, refs = rag_query_manual(query, vector_store, client, docs)
         print(f"  {answer}")
 
         print("\n[方式二：LangChain LCEL]")
@@ -224,13 +228,13 @@ def interactive_loop(vector_store: Chroma, client: OpenAI):
                 show_demo(vector_store, client)
             else:
                 print("检索中...")
-                docs = vector_store.similarity_search(query, k=get_retrieval_k(query))
+                docs = retrieve_docs(query, vector_store)
                 print(f"找到 {len(docs)} 条参考资料:")
                 for i, doc in enumerate(docs):
                     print(f"  {i+1}. {doc.metadata.get('movie_name','?')} "
                           f"({doc.metadata.get('year','?')})")
                 print("\nAI 回答:")
-                answer, _ = rag_query_manual(query, vector_store, client)
+                answer, _ = rag_query_manual(query, vector_store, client, docs)
                 print(f"  {answer}\n")
         except Exception as e:
             print(f"\n[错误] {type(e).__name__}: {e}")

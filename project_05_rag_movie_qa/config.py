@@ -12,7 +12,7 @@ DATA_DIR = BASE_DIR.parent / "data"
 COLLECTION_NAME = "tmdb_movies"
 EMBEDDING_MODEL = "text-embedding-v4"
 RETRIEVAL_K = 5
-RANKING_K = 10  # 排序/极值类查询时的检索数量        # 检索召回
+RANKING_K = 10  # 排序/极值类查询时的检索数量（极值由全量扫描保证，无需过大）
 
 DEFAULT_NICK = "小新"
 DEFAULT_CHARACTER = "人小鬼大"

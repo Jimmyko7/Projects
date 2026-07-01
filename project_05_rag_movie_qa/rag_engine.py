@@ -133,16 +133,13 @@ def get_retrieval_k(query: str) -> int:
     return RANKING_K if _is_ranking_query(query) else RETRIEVAL_K
 
 
-def search_movies(query: str, vector_store, k: int | None = None) -> tuple[str, list]:
-    """
-    语义检索电影知识库。
+def retrieve_docs(query: str, vector_store, k: int | None = None) -> list:
+    """智能检索：动态 K + 极值全量排序，返回 Document 列表。
 
-    k 为 None 时根据查询意图自动选择检索数量。
-    返回:
-        (上下文字符串, [(片名,年份,评分,类型,时长,主演), ...])
+    所有调用方（CLI / Streamlit）统一走此入口，避免绕过排序逻辑。
     """
     if vector_store is None:
-        return "", []
+        return []
 
     if k is None:
         k = get_retrieval_k(query)
@@ -157,17 +154,29 @@ def search_movies(query: str, vector_store, k: int | None = None) -> tuple[str, 
         extreme_docs = _fetch_top_by_field(
             vector_store, ranking_field, top_k=5
         )
-        seen_ids = {d.metadata.get("movie_name") for d in docs}
+        seen_names = {d.metadata.get("movie_name") for d in docs}
         for ed in extreme_docs:
-            if ed.metadata.get("movie_name") not in seen_ids:
+            if ed.metadata.get("movie_name") not in seen_names:
                 docs.append(ed)
-                seen_ids.add(ed.metadata.get("movie_name"))
+                seen_names.add(ed.metadata.get("movie_name"))
         docs = _sort_docs_by_field(docs, ranking_field)
     elif ranking_field:
         docs = _sort_docs_by_field(docs, ranking_field)
 
+    return docs
+
+
+def search_movies(query: str, vector_store, k: int | None = None) -> tuple[str, list]:
+    """
+    语义检索电影知识库。
+
+    k 为 None 时根据查询意图自动选择检索数量。
+    返回:
+        (上下文字符串, [(片名,年份,评分,类型,时长,主演), ...])
+    """
+    docs = retrieve_docs(query, vector_store, k)
     if not docs:
-        return "", ""
+        return "", []
 
     parts = ["【以下是从 TMDB 电影知识库检索到的参考资料】"]
     refs = []
