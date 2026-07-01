@@ -1,37 +1,45 @@
+"""scraper.py — TMDB 电影榜单爬虫（改进版）
+
+改进点：
+1. 移除 verify=False，启用 SSL 证书验证（TMDB 有合法证书）
+2. POST 参数日期动态计算，不再硬编码过期时间戳
+3. 配置分离到 config.py，XPath/URL 集中管理
+4. 用 logging 替代 print，支持命令行控制日志级别
+5. 支持 argparse 命令行参数（页码范围 / 输出路径 / 延时等）
+
+用法:
+    python scraper.py                          # 默认爬 1-5 页
+    python scraper.py --start-page 1 --end-page 10  # 爬 1-10 页
+    python scraper.py -o my_movies.csv               # 指定输出文件
+    python scraper.py --delay 1.5                    # 调快延时
+    python scraper.py -v                              # verbose 模式
+"""
+
+import argparse
 import csv
+import logging
+import time
+from pathlib import Path
+
 import requests
 from lxml import html
-import time
-import urllib3
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# 禁用 SSL 警告
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import config
 
-# 常量
-MOVIE_LIST_FILE = "csv_files/movie_list.csv"
-TMDB_BASE_URL = "https://www.themoviedb.org/"
-TMDB_TOP_URL_1 = "https://www.themoviedb.org/movie/top-rated"
-TMDB_TOP_URL_2 = "https://www.themoviedb.org/discover/movie/items"
+# ── 日志 ──────────────────────────────────────────────
+logger = logging.getLogger("scraper")
 
-# 设置请求头
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    "Connection": "keep-alive",
-    "Referer": "https://www.themoviedb.org/",
-}
-
-
-# 创建会话，配置重试策略
-def create_session():
+# ── HTTP 会话 ──────────────────────────────────────────
+def create_session() -> requests.Session:
+    """创建带重试策略的 requests 会话。"""
     session = requests.Session()
+    session.headers.update(config.HEADERS)
     retry_strategy = Retry(
-        total=3,  # 最大重试次数
-        backoff_factor=2,  # 重试间隔: 2s, 4s, 8s
-        status_forcelist=[429, 500, 502, 503, 504],  # 需要重试的状态码
+        total=config.RETRY_TOTAL,
+        backoff_factor=config.RETRY_BACKOFF_FACTOR,
+        status_forcelist=config.RETRY_STATUS_FORCELIST,
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("https://", adapter)
@@ -39,146 +47,209 @@ def create_session():
     return session
 
 
-# 获取电影详情数据
-def get_movie_info(movie_info_url, session):
-    try:
-        # 1.发送请求，获取影详情数据
-        movie_response = session.get(
-            movie_info_url,
-            headers=HEADERS,
-            timeout=60,
-            verify=False
-        )
-        movie_response.raise_for_status()
-        print(f"发送请求{movie_info_url},获取电影详情数据....")
+# ── 电影详情解析 ──────────────────────────────────────
+def parse_movie_detail(html_tree) -> dict[str, str]:
+    """从电影详情页 HTML 树中提取所有字段。
 
-        # 2.解析数据，获取电影详情
-        movie_document = html.fromstring(movie_response.text)
-        # 电影名
-        movie_names = movie_document.xpath("//*[@id='original_header']/div[2]/section/div[1]/h2/a/text()")
-        # 电影年份
-        movie_years = movie_document.xpath("//*[@id='original_header']/div[2]/section/div[1]/h2/span/text()")
-        # 上映时间
-        movie_dates = movie_document.xpath(
-            "//*[@id='original_header']/div[2]/section/div[1]/div/span[@class='release']/text()")
-        # 类型
-        movie_types = movie_document.xpath(
-            "//*[@id='original_header']/div[2]/section/div[1]/div/span[@class='genres']/a/text()")
-        # 时长
-        movie_times = movie_document.xpath(
-            "//*[@id='original_header']/div[2]/section/div[1]/div/span[@class='runtime']/text()")
-        # 评分
-        movie_scores = movie_document.xpath("//*[@id='consensus_pill']/div/div[1]/div/div/@data-percent")
-        # 语言
-        movie_languages = movie_document.xpath(
-            "//*[@id='media_v4']/div/div/div[2]/div/section/div[1]/div/section[1]/p[3]/text()")
-        # 导演
-        movie_directors = movie_document.xpath(
-            "//*[@id='original_header']/div[2]/section/div[3]/ol/li[1]/p[1]/a/text()")
-        # 作者
-        movie_authors = movie_document.xpath("//*[@id='original_header']/div[2]/section/div[3]/ol/li[2]/p[1]/a/text()")
-        # 主演
-        movie_actors = movie_document.xpath("//*[@id='cast_scroller']/ol/li[1]/p[1]/a/text()")
-        # Slogan
-        movie_slogans = movie_document.xpath("//*[@id='original_header']/div[2]/section/div[3]/h3[1]/text()")
-        # 简介
-        movie_details = movie_document.xpath("//*[@id='original_header']/div[2]/section/div[3]/div/p/text()")
-        # 3.返回电影详情数据 - 字典
-        movie_info = {
-            "电影名": movie_names[0].strip() if movie_names else "",
-            "年份": movie_years[0].strip() if movie_years else "",
-            "上映时间": movie_dates[0].strip() if movie_dates else "",
-            "类型": ",".join(movie_types) if movie_types else "",
-            "时长": movie_times[0].strip() if movie_times else "",
-            "评分": movie_scores[0].strip() if movie_scores else "",
-            "语言": movie_languages[0].strip() if movie_languages else "",
-            "导演": movie_directors[0].strip() if movie_directors else "",
-            "作者": movie_authors[0].strip() if movie_authors else "",
-            "主演": ",".join(movie_actors) if movie_actors else "",
-            "Slogan": movie_slogans[0].strip() if movie_slogans else "",
-            "简介": movie_details[0].strip() if movie_details else "",
-        }
-        return movie_info
-    except Exception as e:
-        print(f"获取电影详情失败: {movie_info_url}, 错误: {e}")
-        return None
+    使用 config.MOVIE_XPATH 字典进行批量解析，
+    对多值字段（类型、主演）用逗号拼接，
+    对单值字段取首个结果。
+    """
+    info: dict[str, str] = {}
 
-
-# 保存电影数据
-def save_all_movies(all_movies):
-    with open(MOVIE_LIST_FILE, "w", encoding="utf-8-sig", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile,
-                                fieldnames=["电影名", "年份", "上映时间", "类型", "时长", "评分", "语言", "导演",
-                                            "作者", "主演", "Slogan", "简介"])
-        writer.writeheader()  # 写入表头
-        writer.writerows(all_movies)  # 写入数据
-        print("保存电影数据成功！")
-
-
-# 主函数
-def main():
-    all_movies = []  # 保存所有电影数据
-
-    # 创建会话
-    session = create_session()
-
-    # 循环获取从第1页到第5页的电影数据
-    for page_num in range(1, 6):
-        try:
-            # 1.发送请求。获取高分电影榜单数据
-            if page_num == 1:
-                response = session.get(
-                    TMDB_TOP_URL_1,
-                    headers=HEADERS,
-                    timeout=60,
-                    verify=False
-                )
-            else:
-                response = session.post(
-                    TMDB_TOP_URL_2,
-                    f"air_date.gte=&air_date.lte=&certification=&certification_country=CN&debug=&first_air_date.gte=&first_air_date.lte=&include_adult=false&include_softcore=false&latest_ceremony.gte=&latest_ceremony.lte=&page={page_num}&primary_release_date.gte=&primary_release_date.lte=&region=&release_date.gte=&release_date.lte=2026-10-21&show_me=everything&sort_by=vote_average.desc&vote_average.gte=0&vote_average.lte=10&vote_count.gte=300&watch_region=CN&with_genres=&with_keywords=&with_networks=&with_origin_country=&with_original_language=&with_watch_monetization_types=&with_watch_providers=&with_release_type=&with_runtime.gte=0&with_runtime.lte=400",
-                    headers=HEADERS,
-                    timeout=60,
-                    verify=False
-                )
-
-            response.raise_for_status()
-            print("发送请求,获取TMDB电影榜单数据")
-
-            # 2.解析数据，获取电影列表
-            document = html.fromstring(response.text)
-            movie_list = document.xpath("//div[contains(@class, 'poster-card')]")
-
-            # 3.遍历电影列表，获取电影详情
-            for mv in movie_list:
-                # 获取a里的超链接href
-                movie_urls = mv.xpath("./div/div/a/@href")
-                if movie_urls:
-                    # 电影详情的url - 修复URL拼接问题，避免双斜杠
-                    movie_path = movie_urls[0].strip("/")
-                    movie_info_url = f"{TMDB_BASE_URL.rstrip('/')}/{movie_path}"
-                    # 发送请求，获取电影详情数据
-                    movie_info = get_movie_info(movie_info_url, session)
-                    if movie_info:
-                        all_movies.append(movie_info)
-
-                    # 增加延时，避免请求过快
-                    time.sleep(2)
-
-            print(f"第{page_num}页处理完成,共获取{len(all_movies)}部电影")
-            time.sleep(3)
-
-        except Exception as e:
-            print(f"第{page_num}页获取失败,错误: {e}")
+    for field, xpath in config.MOVIE_XPATH.items():
+        results = html_tree.xpath(xpath)
+        if not results:
+            info[field] = ""
             continue
 
-    # 4.保存数据，保存为csv文件
-    print("获取到所有电影详情,保存到csv文件")
-    save_all_movies(all_movies)
+        # 多值字段：逗号拼接
+        if field in ("类型", "主演"):
+            info[field] = ",".join(r.strip() for r in results if r.strip())
+        else:
+            info[field] = str(results[0]).strip()
 
-    # 关闭会话
+    return info
+
+
+def fetch_movie_info(movie_url: str, session: requests.Session) -> dict[str, str] | None:
+    """请求单部电影详情页并解析。
+
+    Returns:
+        电影信息字典；失败时返回 None。
+    """
+    try:
+        logger.debug("请求详情: %s", movie_url)
+        resp = session.get(movie_url, timeout=config.REQUEST_TIMEOUT)
+        resp.raise_for_status()
+
+        tree = html.fromstring(resp.text)
+        info = parse_movie_detail(tree)
+        logger.debug("解析成功: %s", info.get("电影名", "?"))
+        return info
+
+    except requests.RequestException as e:
+        logger.warning("请求失败 %s: %s", movie_url, e)
+    except Exception as e:
+        logger.warning("解析失败 %s: %s", movie_url, e)
+
+    return None
+
+
+# ── CSV 保存 ───────────────────────────────────────────
+def save_movies(movies: list[dict], output_path: Path) -> None:
+    """将电影数据保存为 UTF-8-BOM CSV。"""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=config.CSV_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(movies)
+    logger.info("已保存 %d 部电影 → %s", len(movies), output_path)
+
+
+# ── 主流程 ─────────────────────────────────────────────
+def run(
+    start_page: int = config.DEFAULT_START_PAGE,
+    end_page: int = config.DEFAULT_END_PAGE,
+    output_path: Path | None = None,
+    movie_delay: float = config.MOVIE_DELAY,
+    page_delay: float = config.PAGE_DELAY,
+) -> list[dict]:
+    """执行爬取主逻辑。
+
+    Args:
+        start_page: 起始页码（1-based）
+        end_page: 结束页码（含）
+        output_path: CSV 输出路径；None 时使用默认值
+        movie_delay: 每部电影间延时（秒）
+        page_delay: 每页间延时（秒）
+
+    Returns:
+        爬取到的所有电影数据列表。
+    """
+    if output_path is None:
+        output_path = config.OUTPUT_FILE
+
+    all_movies: list[dict] = []
+    session = create_session()
+
+    total_pages = end_page - start_page + 1
+    logger.info("开始爬取 TMDB Top Rated: 第 %d → %d 页（共 %d 页）", start_page, end_page, total_pages)
+
+    for page_num in range(start_page, end_page + 1):
+        logger.info("━ 第 %d/%d 页 ━", page_num, end_page)
+
+        try:
+            # 第 1 页用 GET，其余页用 POST
+            if page_num == 1:
+                resp = session.get(
+                    config.TMDB_TOP_URL_1,
+                    timeout=config.REQUEST_TIMEOUT,
+                )
+            else:
+                body = config.build_discover_params(page_num)
+                resp = session.post(
+                    config.TMDB_TOP_URL_2,
+                    data=body,
+                    timeout=config.REQUEST_TIMEOUT,
+                )
+
+            resp.raise_for_status()
+            tree = html.fromstring(resp.text)
+
+            # 提取卡片列表
+            cards = tree.xpath(config.POSTER_CARD_XPATH)
+            logger.info("本页发现 %d 个卡片", len(cards))
+
+            for card in cards:
+                links = card.xpath(config.POSTER_LINK_XPATH)
+                if not links:
+                    continue
+
+                movie_path = links[0].strip("/")
+                movie_url = f"{config.TMDB_BASE_URL.rstrip('/')}/{movie_path}"
+
+                info = fetch_movie_info(movie_url, session)
+                if info:
+                    all_movies.append(info)
+
+                time.sleep(movie_delay)
+
+            logger.info("第 %d 页完成，已累计 %d 部", page_num, len(all_movies))
+            time.sleep(page_delay)
+
+        except requests.RequestException as e:
+            logger.error("第 %d 页请求失败: %s", page_num, e)
+            continue
+        except Exception as e:
+            logger.error("第 %d 页处理异常: %s", page_num, e)
+            continue
+
     session.close()
 
+    if all_movies:
+        save_movies(all_movies, output_path)
+    else:
+        logger.warning("未获取到任何电影数据！")
 
-if __name__ == '__main__':
+    return all_movies
+
+
+# ── CLI 入口 ───────────────────────────────────────────
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="TMDB 电影榜单爬虫 — 抓取 Top Rated 电影数据并导出 CSV",
+    )
+    parser.add_argument(
+        "--start-page", type=int, default=config.DEFAULT_START_PAGE,
+        help=f"起始页码（默认: {config.DEFAULT_START_PAGE}）",
+    )
+    parser.add_argument(
+        "--end-page", type=int, default=config.DEFAULT_END_PAGE,
+        help=f"结束页码（默认: {config.DEFAULT_END_PAGE}）",
+    )
+    parser.add_argument(
+        "-o", "--output", type=Path, default=config.OUTPUT_FILE,
+        help=f"CSV 输出路径（默认: {config.OUTPUT_FILE}）",
+    )
+    parser.add_argument(
+        "--delay", type=float, default=config.MOVIE_DELAY,
+        help=f"每部电影间延时/秒（默认: {config.MOVIE_DELAY}）",
+    )
+    parser.add_argument(
+        "--page-delay", type=float, default=config.PAGE_DELAY,
+        help=f"每页间延时/秒（默认: {config.PAGE_DELAY}）",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
+        help="详细日志（DEBUG 级别）",
+    )
+
+    args = parser.parse_args()
+
+    # 日志配置
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    # 参数校验
+    if args.start_page < 1:
+        logger.error("起始页码必须 ≥ 1")
+        return
+    if args.end_page < args.start_page:
+        logger.error("结束页码不能小于起始页码")
+        return
+
+    run(
+        start_page=args.start_page,
+        end_page=args.end_page,
+        output_path=args.output,
+        movie_delay=args.delay,
+        page_delay=args.page_delay,
+    )
+
+
+if __name__ == "__main__":
     main()
