@@ -1,6 +1,7 @@
 """app.py — AI 智能伴侣 Streamlit 应用 | streamlit run app.py"""
 
-import streamlit as st, os
+import streamlit as st
+import os
 from openai import OpenAI
 from config import SESSION_DIR, DEFAULT_NICK, DEFAULT_CHARACTER, LLM_MODEL, LLM_BASE_URL
 from session_manager import generate_name, list_all, save, load, remove
@@ -11,7 +12,11 @@ st.title("AI 智能伴侣")
 for k, v in [("messages", []), ("nick_name", DEFAULT_NICK), ("character", DEFAULT_CHARACTER), ("current_session", generate_name())]:
     if k not in st.session_state: st.session_state[k] = v
 
-client = OpenAI(api_key=os.environ.get("DEEPSEEK_API_KEY"), base_url=LLM_BASE_URL)
+api_key = os.environ.get("DEEPSEEK_API_KEY")
+if not api_key:
+    st.error("❌ 未设置 DEEPSEEK_API_KEY 环境变量，请配置后重启应用。")
+    st.stop()
+client = OpenAI(api_key=api_key, base_url=LLM_BASE_URL)
 
 st.text(f"会话: {st.session_state.current_session}")
 for m in st.session_state.messages:

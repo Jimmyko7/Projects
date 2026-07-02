@@ -1,6 +1,7 @@
 """session_manager.py — 聊天会话 JSON 持久化"""
 
-import os, json
+import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -25,8 +26,10 @@ def load(name: str, d: Path) -> dict | None:
     p = str(d / f"{name}.json")
     if not os.path.exists(p): return None
     try:
-        with open(p, "r", encoding="utf-8") as f: return json.load(f)
-    except Exception: return None
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def remove(name: str, d: Path) -> bool:

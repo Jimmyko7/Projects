@@ -40,9 +40,11 @@ def get_vector_store():
 vector_store = get_vector_store()
 rag_available = vector_store is not None
 
-client = OpenAI(
-    api_key=os.environ.get("DEEPSEEK_API_KEY"), base_url=LLM_BASE_URL,
-)
+api_key = os.environ.get("DEEPSEEK_API_KEY")
+if not api_key:
+    st.error("❌ 未设置 DEEPSEEK_API_KEY 环境变量，请配置后重启应用。")
+    st.stop()
+client = OpenAI(api_key=api_key, base_url=LLM_BASE_URL)
 
 
 # ═══════════════ 聊天历史 ═══════════════

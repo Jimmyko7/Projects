@@ -36,6 +36,7 @@ def create_session() -> requests.Session:
     """创建带重试策略的 requests 会话。"""
     session = requests.Session()
     session.headers.update(config.HEADERS)
+    session.verify = config.VERIFY_SSL
     retry_strategy = Retry(
         total=config.RETRY_TOTAL,
         backoff_factor=config.RETRY_BACKOFF_FACTOR,
@@ -136,61 +137,64 @@ def run(
     total_pages = end_page - start_page + 1
     logger.info("开始爬取 TMDB Top Rated: 第 %d → %d 页（共 %d 页）", start_page, end_page, total_pages)
 
-    for page_num in range(start_page, end_page + 1):
-        logger.info("━ 第 %d/%d 页 ━", page_num, end_page)
+    try:
+        for page_num in range(start_page, end_page + 1):
+            logger.info("━ 第 %d/%d 页 ━", page_num, end_page)
 
-        try:
-            # 第 1 页用 GET，其余页用 POST
-            if page_num == 1:
-                resp = session.get(
-                    config.TMDB_TOP_URL_1,
-                    timeout=config.REQUEST_TIMEOUT,
-                )
-            else:
-                body = config.build_discover_params(page_num)
-                resp = session.post(
-                    config.TMDB_TOP_URL_2,
-                    data=body,
-                    timeout=config.REQUEST_TIMEOUT,
-                )
+            try:
+                # 第 1 页用 GET，其余页用 POST
+                if page_num == 1:
+                    resp = session.get(
+                        config.TMDB_TOP_URL_1,
+                        timeout=config.REQUEST_TIMEOUT,
+                    )
+                else:
+                    body = config.build_discover_params(page_num)
+                    resp = session.post(
+                        config.TMDB_TOP_URL_2,
+                        data=body,
+                        timeout=config.REQUEST_TIMEOUT,
+                    )
 
-            resp.raise_for_status()
-            tree = html.fromstring(resp.text)
+                resp.raise_for_status()
+                tree = html.fromstring(resp.text)
 
-            # 提取卡片列表
-            cards = tree.xpath(config.POSTER_CARD_XPATH)
-            logger.info("本页发现 %d 个卡片", len(cards))
+                # 提取卡片列表
+                cards = tree.xpath(config.POSTER_CARD_XPATH)
+                logger.info("本页发现 %d 个卡片", len(cards))
 
-            for card in cards:
-                links = card.xpath(config.POSTER_LINK_XPATH)
-                if not links:
-                    continue
+                for card in cards:
+                    links = card.xpath(config.POSTER_LINK_XPATH)
+                    if not links:
+                        continue
 
-                movie_path = links[0].strip("/")
-                movie_url = f"{config.TMDB_BASE_URL.rstrip('/')}/{movie_path}"
+                    movie_path = links[0].strip("/")
+                    movie_url = f"{config.TMDB_BASE_URL.rstrip('/')}/{movie_path}"
 
-                info = fetch_movie_info(movie_url, session)
-                if info:
-                    all_movies.append(info)
+                    info = fetch_movie_info(movie_url, session)
+                    if info:
+                        all_movies.append(info)
 
-                time.sleep(movie_delay)
+                    time.sleep(movie_delay)
 
-            logger.info("第 %d 页完成，已累计 %d 部", page_num, len(all_movies))
-            time.sleep(page_delay)
+                logger.info("第 %d 页完成，已累计 %d 部", page_num, len(all_movies))
+                time.sleep(page_delay)
 
-        except requests.RequestException as e:
-            logger.error("第 %d 页请求失败: %s", page_num, e)
-            continue
-        except Exception as e:
-            logger.error("第 %d 页处理异常: %s", page_num, e)
-            continue
+            except requests.RequestException as e:
+                logger.error("第 %d 页请求失败: %s", page_num, e)
+                continue
+            except Exception as e:
+                logger.error("第 %d 页处理异常: %s", page_num, e)
+                continue
 
-    session.close()
-
-    if all_movies:
-        save_movies(all_movies, output_path)
-    else:
-        logger.warning("未获取到任何电影数据！")
+    except KeyboardInterrupt:
+        logger.warning("用户中断，正在保存已爬取的数据...")
+    finally:
+        session.close()
+        if all_movies:
+            save_movies(all_movies, output_path)
+        else:
+            logger.warning("未获取到任何电影数据！")
 
     return all_movies
 

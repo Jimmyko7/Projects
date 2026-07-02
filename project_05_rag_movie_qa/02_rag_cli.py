@@ -114,7 +114,7 @@ def rag_query_manual(
     system_prompt = RAG_SYSTEM_PROMPT.format(context=context)
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": query},
@@ -141,9 +141,9 @@ def rag_query_lcel(query: str, vector_store: Chroma) -> str:
     from langchain_community.chat_models.openai import ChatOpenAI
 
     model = ChatOpenAI(
-        model="deepseek-chat",
+        model=LLM_MODEL,
         api_key=os.environ.get("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com/v1",
+        base_url=f"{LLM_BASE_URL}/v1",
         temperature=0.7,
     )
 

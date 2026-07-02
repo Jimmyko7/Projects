@@ -43,7 +43,7 @@ def load(name: str, session_dir: Path) -> dict | None:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return None
 
 

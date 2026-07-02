@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 # ── 基础路径 ──────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "csv_files"
-OUTPUT_FILE = OUTPUT_DIR / "movie_list.csv"
+OUTPUT_FILE = OUTPUT_DIR / "movies.csv"
 
 # ── TMDB URL ──────────────────────────────────────────
 TMDB_BASE_URL = "https://www.themoviedb.org"
@@ -33,6 +33,7 @@ HEADERS = {
 REQUEST_TIMEOUT = 60          # 单次请求超时（秒）
 PAGE_DELAY = 3                # 页间延时（秒）
 MOVIE_DELAY = 2               # 每部电影间延时（秒）
+VERIFY_SSL = True             # SSL 证书验证（网络兼容问题时临时设为 False）
 
 # 重试策略
 RETRY_TOTAL = 3

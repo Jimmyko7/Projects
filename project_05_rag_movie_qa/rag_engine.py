@@ -87,7 +87,7 @@ def _fetch_top_by_field(vector_store, field: str, top_k: int) -> list:
             include=["documents", "metadatas"],
             limit=9999,  # ChromaDB 默认 limit 可能不够，显式设大
         )
-    except Exception:
+    except (ValueError, KeyError, OSError):
         return []
 
     if not raw or not raw["ids"]:
@@ -118,7 +118,7 @@ def load_vector_store() -> Chroma | None:
             embedding_function=embeddings,
             persist_directory=str(CHROMA_DIR),
         )
-    except Exception:
+    except (ValueError, ImportError, OSError):
         return None
 
 

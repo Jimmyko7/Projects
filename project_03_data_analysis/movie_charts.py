@@ -8,10 +8,18 @@ TMDB-TOP300电影榜单数据统计分析
 4. 统计对比各个电影评分的比例（饼状图）
 """
 
+import logging
+from pathlib import Path
+
 import pandas as pd
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 import matplotlib
+
+logger = logging.getLogger(__name__)
+
+# 资源路径（相对于本项目目录）
+_RESOURCES_DIR = Path(__file__).resolve().parent / "resources"
 
 
 def configure_matplotlib():
@@ -19,28 +27,31 @@ def configure_matplotlib():
     # 解决PyCharm后端兼容性问题
     try:
         matplotlib.use('TkAgg')  # 尝试使用TkAgg后端
-    except:
+    except ImportError:
         pass  # 如果失败则使用默认后端
     
     plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 
-def load_movie_data(file_path='./resources/movies.csv'):
+def load_movie_data(file_path=None):
     """
     加载电影数据
-    
+
     Args:
-        file_path: CSV文件路径
-        
+        file_path: CSV文件路径（默认: resources/movies.csv）
+
     Returns:
         DataFrame: 包含电影数据的DataFrame对象
     """
+    if file_path is None:
+        file_path = _RESOURCES_DIR / "movies.csv"
     df = pd.read_csv(
         file_path,
         usecols=['电影名', '年份', '上映时间', '语言', '类型', '评分'],
-        dtype={'年份': 'Int64'}
     )
+    df['年份'] = df['年份'].astype(str).str.replace(r'[\(\)]', '', regex=True)
+    df['年份'] = pd.to_numeric(df['年份'], errors='coerce').astype('Int64')
     return df
 
 
@@ -128,7 +139,7 @@ def plot_language_distribution(ax, language_count):
         language_count: 语言统计数据
     """
     ax.bar(language_count.index, language_count.values, width=0.5)
-    ax.tick_params(axis='x', rotation=40)
+    ax.tick_params(axis='x', rotation=45)
     
     ax.set_title('不同语言电影数量', fontsize=15)
     ax.set_xlabel('语言', fontsize=15)
@@ -159,11 +170,12 @@ def plot_type_distribution(ax, type_count):
         ax: Matplotlib Axes对象
         type_count: 类型统计数据
     """
-    ax.bar(type_count.index, type_count.values, width=0.5)
+    ax.bar(type_count.index, type_count.values, width=0.4)
     ax.set_title('不同类型电影数量', fontsize=15)
     ax.set_xlabel('类型')
     ax.set_ylabel('电影数量')
     ax.grid(linestyle='--', alpha=0.3)
+    ax.tick_params(axis='x', rotation=45)
 
 
 def calculate_score_statistics(df, threshold=0.02):
@@ -225,58 +237,60 @@ def create_figure():
 
 def main():
     """主函数：执行完整的数据分析流程"""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
     # 1. 配置Matplotlib
     configure_matplotlib()
-    
+
     # 2. 加载数据
-    print("正在加载电影数据...")
+    logger.info("正在加载电影数据...")
     df = load_movie_data()
-    print(f"成功加载 {len(df)} 条电影数据")
-    
+    logger.info("成功加载 %d 条电影数据", len(df))
+
     # 3. 预处理数据
-    print("正在预处理数据...")
+    logger.info("正在预处理数据...")
     df_processed = preprocess_year_data(df)
-    
+
     # 4. 创建画布
     figure, axes = create_figure()
-    
+
     # 5. 需求1：绘制年份趋势折线图
-    print("正在分析年份趋势...")
+    logger.info("正在分析年份趋势...")
     x_years, y_counts = calculate_year_statistics(df_processed)
     plot_year_trend(axes[0, 0], x_years, y_counts)
-    
+
     # 6. 需求2：绘制语言分布柱状图
-    print("正在分析语言分布...")
+    logger.info("正在分析语言分布...")
     language_count = calculate_language_statistics(df)
     plot_language_distribution(axes[0, 1], language_count)
-    
+
     # 7. 需求3：绘制类型分布柱状图
-    print("正在分析类型分布...")
+    logger.info("正在分析类型分布...")
     type_count = calculate_type_statistics(df)
     plot_type_distribution(axes[1, 0], type_count)
-    
+
     # 8. 需求4：绘制评分比例饼图
-    print("正在分析评分比例...")
+    logger.info("正在分析评分比例...")
     score_count = calculate_score_statistics(df)
     plot_score_distribution(axes[1, 1], score_count)
-    
+
     # 9. 保存图表
-    output_path = './resources/TMDB-TOP300.jpg'
-    print(f"正在保存图表到 {output_path}...")
-    plt.savefig(output_path)
-    print("图表已保存！")
-    
+    output_path = _RESOURCES_DIR / "TMDB-TOP300.jpg"
+    logger.info("正在保存图表到 %s...", output_path)
+    plt.savefig(str(output_path))
+    logger.info("图表已保存！")
+
     # 10. 显示图表
-    print("分析完成！显示图表...")
+    logger.info("分析完成！显示图表...")
     try:
         plt.show()
     except AttributeError as e:
-        print(f"警告: 图表显示遇到问题 - {e}")
-        print("提示: 图表已成功保存，您可以在 ./resources/TMDB-TOP300.jpg 查看结果")
-        print("如需在PyCharm中正常显示，请尝试以下方法：")
-        print("  1. 更新PyCharm到最新版本")
-        print("  2. 或在File -> Settings -> Tools -> Python Scientific中取消勾选'Show plots in tool window'")
-    print("程序执行完毕！")
+        logger.warning("图表显示遇到问题 - %s", e)
+        logger.info("提示: 图表已成功保存，您可以在 %s 查看结果", output_path)
+        logger.info("如需在PyCharm中正常显示，请尝试以下方法：")
+        logger.info("  1. 更新PyCharm到最新版本")
+        logger.info("  2. 或在File -> Settings -> Tools -> Python Scientific中取消勾选'Show plots in tool window'")
+    logger.info("程序执行完毕！")
 
 
 if __name__ == '__main__':

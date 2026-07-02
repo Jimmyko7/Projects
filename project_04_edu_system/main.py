@@ -1,9 +1,14 @@
-# 采用面向对象的编程思想，完成教务管理系统的开发。教务管理系统可以管理在校学生的成绩信息，通过控制台菜单与用户交互，具体的功能如下:
-# 1.添加学生成绩:根据输入的学生姓名、语文成绩、数学成绩、英语成绩，记录在系统中
-# 2.修改学生成绩:根据输入的学生姓名，修改对应的学生成绩
-# 3.删除学生成绩:根据输入的学生姓名，删除对应的学生成绩
-# 4.查询指定学生成绩:根据输入的学生姓名，查找对应的学生成绩，并输出
-# 5.展示全部学生成绩:展示出系统中所有学生的成绩
+"""
+教务管理系统 — 纯 OOP 实现
+
+功能：
+  1. 添加学生成绩
+  2. 修改学生成绩
+  3. 删除学生成绩
+  4. 查询指定学生成绩
+  5. 展示全部学生成绩
+"""
+
 
 class StuGrade:
     # 定义实例方法
@@ -34,7 +39,7 @@ class EduManagement:
 
     # 定义实例方法
     def __init__(self):
-        self. stu_list = []
+        self.stu_list = []
 
     # 添加学生成绩
     def add_stu(self):
@@ -43,12 +48,16 @@ class EduManagement:
             if s.name == name:
                 print("该学生姓名已存在！")
                 return
-        chinese = int(input("请输入语文成绩："))
-        math = int(input("请输入数学成绩："))
-        english = int(input("请输入英语成绩："))
+        try:
+            chinese = int(input("请输入语文成绩："))
+            math = int(input("请输入数学成绩："))
+            english = int(input("请输入英语成绩："))
+        except ValueError:
+            print("成绩必须为数字，请重新输入！")
+            return
         # 分数限制在0~100内
         if 0 <= chinese <= 100 and 0 <= math <= 100 and 0 <= english <= 100:
-            stu = StuGrade(name,chinese, math, english)
+            stu = StuGrade(name, chinese, math, english)
             self.stu_list.append(stu)
             print("学生信息添加成功！")
         else:
@@ -60,9 +69,13 @@ class EduManagement:
         for s in self.stu_list:
             if s.name == name:
                 print(f"当前成绩：{s}")
-                chinese = int(input("请输入修改后的语文成绩："))
-                math = int(input("请输入修改后的数学成绩："))
-                english = int(input("请输入修改后的英语成绩："))
+                try:
+                    chinese = int(input("请输入修改后的语文成绩："))
+                    math = int(input("请输入修改后的数学成绩："))
+                    english = int(input("请输入修改后的英语成绩："))
+                except ValueError:
+                    print("成绩必须为数字，请重新输入！")
+                    return
                 # 分数限制在0~100内
                 if 0 <= chinese <= 100 and 0 <= math <= 100 and 0 <= english <= 100:
                     s.update(chinese, math, english)
@@ -77,9 +90,9 @@ class EduManagement:
     # 删除学生成绩
     def delete_stu(self):
         name = input("请输入要删除的学生名字：")
-        for s in self.stu_list:
+        for i, s in enumerate(self.stu_list):
             if s.name == name:
-                self.stu_list.remove(s)
+                del self.stu_list[i]
                 print("删除成功！")
                 return
         print("未找到学生，删除失败！")
@@ -95,6 +108,9 @@ class EduManagement:
 
     # 展示全部学生成绩
     def display_all(self):
+        if not self.stu_list:
+            print("暂无学生成绩记录！")
+            return
         for s in self.stu_list:
             print(f"{s}")
 
@@ -103,10 +119,8 @@ class EduManagement:
         print(f"{self.sys_name}")
         while True:
             print("===1.添加学生成绩 2.修改学生成绩 3.删除学生成绩 4.查询指定学生成绩 5.展示全部学生成绩 6.退出系统===")
-            num = int(input("请输入要执行的步骤（1~6）："))
-
-            # 捕获异常
             try:
+                num = int(input("请输入要执行的步骤（1~6）："))
                 match num:
                     case 1:
                         self.add_stu()
@@ -124,11 +138,10 @@ class EduManagement:
                         break
                     case _:
                         print("输入错误！")
-                        continue
-            except ValueError as e:
+            except ValueError:
                 print("输入的数据有问题，请检查，然后重新输入！")
             except Exception as e:
-                print("程序运行错误，请联系管理员，错误信息：")
+                print(f"程序运行错误，请联系管理员，错误信息：{e}")
 if __name__ == "__main__":
 
     edu = EduManagement()
