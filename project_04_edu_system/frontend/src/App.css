@@ -1,0 +1,131 @@
+/* ── App 布局 ─────────────────────────────────── */
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.app-header h1 {
+  font-size: 28px;
+  color: #1a1a1a;
+}
+
+.app-header p {
+  color: #888;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.app-main {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── 工具栏 ────────────────────────────────────── */
+.toolbar {
+  margin-bottom: 20px;
+}
+
+.btn-primary {
+  background: #1677ff;
+  color: #fff;
+  padding: 8px 20px;
+  font-size: 15px;
+}
+
+/* ── 学生列表 ──────────────────────────────────── */
+.student-list .list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #666;
+}
+
+.student-list .list-header button {
+  background: #f0f0f0;
+  color: #333;
+}
+
+td.total {
+  font-weight: 700;
+  color: #1677ff;
+}
+
+td.actions {
+  display: flex;
+  gap: 6px;
+}
+
+td.actions button {
+  padding: 4px 12px;
+  font-size: 13px;
+  background: #1677ff;
+  color: #fff;
+}
+
+td.actions button.danger {
+  background: #ff4d4f;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.empty-state button {
+  margin-top: 12px;
+  background: #1677ff;
+  color: #fff;
+}
+
+/* ── 表单 ──────────────────────────────────────── */
+.student-form h3 {
+  margin-bottom: 20px;
+  font-size: 18px;
+}
+
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-field {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.form-actions button:first-child {
+  background: #1677ff;
+  color: #fff;
+}
+
+.form-actions button:last-child {
+  background: #f0f0f0;
+  color: #333;
+}

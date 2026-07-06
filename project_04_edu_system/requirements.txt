@@ -1,1 +1,3 @@
-# 纯 Python 标准库
+# 后端依赖（前后端分离改造 v2.0）
+fastapi>=0.139.0
+uvicorn[standard]>=0.34.0
