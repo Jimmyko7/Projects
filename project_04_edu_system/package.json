@@ -1,0 +1,11 @@
+{
+  "name": "edu-system",
+  "version": "1.0.0",
+  "description": "教务管理系统 - FastAPI + React 全栈项目",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "dev:backend": "python main.py",
+    "dev": "npm run dev:frontend"
+  }
+}
