@@ -1,11 +1,28 @@
-// API 调用封装 —— 所有与后端通信的逻辑集中在这里
-import type { Student, StudentCreateRequest, StudentUpdateRequest } from '../types/student'
+// API 调用封装 — v2.1：升级到 /api/v1/ + 分页支持
+import type { Student, PaginatedResponse, StudentCreateRequest, StudentUpdateRequest } from '../types/student'
 
-const BASE_URL = '/api/students'
+const BASE_URL = '/api/v1/students'
 
-/** 获取全部学生 */
+/** 获取全部学生（兼容旧调用） */
 export async function fetchAll(): Promise<Student[]> {
-  const res = await fetch(BASE_URL)
+  const res = await fetch(BASE_URL + '?page_size=100')
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+  const data: PaginatedResponse = await res.json()
+  return data.items
+}
+
+/** 分页查询（v2.1 新增） */
+export async function fetchPaginated(params: {
+  page?: number; page_size?: number; search?: string; sort_by?: string; order?: string
+} = {}): Promise<PaginatedResponse> {
+  const query = new URLSearchParams()
+  if (params.page) query.set('page', String(params.page))
+  if (params.page_size) query.set('page_size', String(params.page_size))
+  if (params.search) query.set('search', params.search)
+  if (params.sort_by) query.set('sort_by', params.sort_by)
+  if (params.order) query.set('order', params.order)
+  const qs = query.toString()
+  const res = await fetch(BASE_URL + (qs ? '?' + qs : ''))
   if (!res.ok) throw new Error(`请求失败: ${res.status}`)
   return res.json()
 }

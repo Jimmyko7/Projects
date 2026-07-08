@@ -15,11 +15,13 @@ env/
 # ===== IDE / AI 助手 =====
 .idea/
 .claude/
+.deepseek/
 .vscode/
 *.swp
 *.swo
 
 # ===== 用户数据 / 构建产物 =====
+docx/
 sessions/
 chroma_db/
 .streamlit/
@@ -27,6 +29,11 @@ chroma_db/
 # ===== 密钥文件 =====
 .env
 .env.local
+
+# ===== 数据库文件 =====
+student.db-shm
+student.db-wal
+
 
 # ===== 操作系统 =====
 .DS_Store
