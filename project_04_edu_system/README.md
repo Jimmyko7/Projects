@@ -1,17 +1,20 @@
-# Project 4 — 教务管理系统 v2.0
+# Project 4 — 教务管理系统 v2.1
 
 FastAPI + React + TypeScript + SQLite 前后端分离的全栈 Web 应用。
 
-> v1.0 为纯控制台 OOP 版本（保留于根目录 `main.py`），  
-> v2.0 基于同一套 Repository + SQLite 数据层，向上扩展了 REST API 和 Web 前端。
+> v1.0 纯控制台 OOP 版本（保留于根目录 `main.py`）  
+> v2.0 基于 Repository + SQLite，向上扩展了 REST API 和 Web 前端  
+> v2.1 连接池优化 + 分页搜索排序 + AI 成绩分析 + 路由拆分
 
 ## 功能
 
 - 学生成绩增删改查（Web UI + REST API 双入口）
+- **分页、搜索、排序**（v2.1 新增）
 - 成绩校验（前端 0~100 + 后端 Pydantic 0~100 + 数据库 CHECK 三重保障）
-- 按姓名唯一索引，重名自动提示冲突（409）
-- SQLite 持久化存储
+- **AI 成绩分析**（v2.1 新增：DeepSeek LLM + 本地规则降级）
+- SQLite WAL 模式 + 线程连接复用
 - 自动生成 Swagger API 文档（`/docs`）
+- 旧 API 路径 307 兼容重定向
 
 ## 技术栈
 
@@ -19,8 +22,9 @@ FastAPI + React + TypeScript + SQLite 前后端分离的全栈 Web 应用。
 |----|------|
 | **前端** | React 18 + TypeScript + Vite |
 | **后端** | FastAPI + Pydantic v2 |
-| **数据库** | SQLite3（标准库，零额外依赖） |
-| **设计模式** | Repository 模式、分层架构、RESTful API |
+| **数据库** | SQLite3 WAL 模式（标准库，零额外依赖） |
+| **AI** | DeepSeek API（可选，未配置时自动降级本地规则） |
+| **设计模式** | Repository 模式、分层架构、RESTful API、路由模块化 |
 
 ## 运行（需两个终端）
 
@@ -45,20 +49,24 @@ npm run dev
 ```
                   ┌─────────────────────┐
                   │   React 前端 :5173   │
-                  │  StudentList / Form │
+                  │  StudentList / Form  │
                   └──────────┬──────────┘
                              │ REST API (JSON)
+                             │ /api/v1/*
                   ┌──────────▼──────────┐
-                  │  FastAPI 路由 :8000  │  ← backend/main.py
+                  │  FastAPI 路由        │  ← backend/main.py → routers/
+                  │  ├─ students.py     │    学生 CRUD + 分页
+                  │  └─ ai.py           │    AI 成绩分析
                   │  Pydantic 校验       │  ← backend/schemas.py
                   └──────────┬──────────┘
                              │
                   ┌──────────▼──────────┐
-                  │  StudentRepository   │  ← repository.py（v1 代码未动）
+                  │  StudentRepository   │  ← repository.py
                   └──────────┬──────────┘
                              │
                   ┌──────────▼──────────┐
-                  │  SQLite (student.db) │  ← database.py（v1 代码未动）
+                  │  SQLite WAL 模式     │  ← database.py
+                  │  (student.db)       │    线程连接复用
                   └─────────────────────┘
 ```
 
@@ -66,28 +74,34 @@ npm run dev
 
 | 文件 / 目录 | 职责 |
 |-------------|------|
-| `backend/main.py` | FastAPI 应用入口 + 5 个 RESTful 路由 |
-| `backend/schemas.py` | Pydantic 请求/响应模型 |
-| `repository.py` | `StudentRepository` — SQLite CRUD 封装（v1 代码未动） |
-| `database.py` | 数据库连接 + 建表（v1 代码未动） |
-| `models.py` | `StuGrade` 数据类（v1 代码未动） |
+| `backend/main.py` | FastAPI 应用入口 + 路由注册 + 旧 API 兼容 |
+| `backend/schemas.py` | Pydantic 请求/响应模型（含分页 + AI 分析） |
+| `backend/routers/students.py` | 学生 CRUD + 分页搜索排序路由 |
+| `backend/routers/ai.py` | AI 成绩分析端点（DeepSeek + 降级） |
+| `repository.py` | `StudentRepository` — SQLite CRUD + 分页 |
+| `database.py` | 数据库连接 + WAL 模式 + 线程复用 |
+| `models.py` | `StuGrade` 数据类 |
 | `main.py` | 控制台版本入口（v1.0，保留） |
 | `frontend/src/` | React 前端源码 |
-| `LEARNING_GUIDE.md` | 从项目学 FastAPI + React 的配套文档 |
 
 ## API 接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/api/students` | 获取全部学生 |
-| `GET` | `/api/students/{name}` | 按姓名查询 |
-| `POST` | `/api/students` | 添加学生（重名返回 409） |
-| `PUT` | `/api/students/{name}` | 修改成绩（支持部分更新） |
-| `DELETE` | `/api/students/{name}` | 删除学生 |
+| `GET` | `/api/v1/students` | 学生列表（分页+搜索+排序） |
+| `GET` | `/api/v1/students/{name}` | 按姓名查询 |
+| `POST` | `/api/v1/students` | 添加学生 |
+| `PUT` | `/api/v1/students/{name}` | 修改成绩 |
+| `DELETE` | `/api/v1/students/{name}` | 删除学生 |
+| `POST` | `/api/v1/ai/analyze/{name}` | AI 成绩分析 |
+| `*` | `/api/*` | → 307 重定向到 `/api/v1/*` |
+
+**分页参数**：`?page=1&page_size=20&search=张&sort_by=total&order=desc`
 
 ## 迭代历程
 
 | 版本 | 新增能力 |
 |------|---------|
 | v1.0 | 控制台交互 + SQLite 持久化 + Repository 模式 |
-| v2.0 | FastAPI REST API + React Web UI + 前端校验 + Swagger 文档 |
+| v2.0 | FastAPI REST API + React Web UI + Swagger 文档 |
+| v2.1 | 连接池优化 + 分页搜索排序 + AI 成绩分析 + 路由拆分 + API 版本化 |
